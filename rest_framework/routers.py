@@ -160,57 +160,47 @@ class SimpleRouter(BaseRouter):
         # converting to list as iterables are good for one pass, known host needs to be checked again and again for
         # different functions.
         known_actions = list(flatten([route.mapping.values() for route in self.routes if isinstance(route, Route)]))
+        extra_actions = viewset.get_extra_actions()
 
-        # Determine any `@detail_route` or `@list_route` decorated methods on the viewset
-        detail_routes = []
-        list_routes = []
-        for methodname in dir(viewset):
-            attr = getattr(viewset, methodname)
-            httpmethods = getattr(attr, 'bind_to_methods', None)
-            detail = getattr(attr, 'detail', True)
-            if httpmethods:
-                # checking method names against the known actions list
-                if methodname in known_actions:
-                    raise ImproperlyConfigured('Cannot use @detail_route or @list_route '
-                                               'decorators on method "%s" '
-                                               'as it is an existing route' % methodname)
-                httpmethods = [method.lower() for method in httpmethods]
-                if detail:
-                    detail_routes.append((httpmethods, methodname))
-                else:
-                    list_routes.append((httpmethods, methodname))
+        # checking action names against the known actions list
+        not_allowed = [
+            action.__name__ for action in extra_actions
+            if action.__name__ in known_actions
+        ]
+        if not_allowed:
+            msg = ('Cannot use the @action decorator on the following '
+                   'methods, as they are existing routes: %s')
+            raise ImproperlyConfigured(msg % ', '.join(not_allowed))
 
-        def _get_dynamic_routes(route, dynamic_routes):
-            ret = []
-            for httpmethods, methodname in dynamic_routes:
-                method_kwargs = getattr(viewset, methodname).kwargs
-                initkwargs = route.initkwargs.copy()
-                initkwargs.update(method_kwargs)
-                url_path = initkwargs.pop("url_path", None) or methodname
-                url_path = escape_curly_brackets(url_path)
-                url_name = initkwargs.pop("url_name", None) or url_path
-                ret.append(Route(
-                    url=replace_methodname(route.url, url_path),
-                    mapping={httpmethod: methodname for httpmethod in httpmethods},
-                    name=replace_methodname(route.name, url_name),
-                    initkwargs=initkwargs,
-                ))
+        # partition detail and list routes
+        detail_actions = [action for action in extra_actions if action.detail]
+        list_actions = [action for action in extra_actions if not action.detail]
 
-            return ret
-
-        ret = []
+        routes = []
         for route in self.routes:
             if isinstance(route, DynamicDetailRoute):
-                # Dynamic detail routes (@detail_route decorator)
-                ret += _get_dynamic_routes(route, detail_routes)
+                routes += [self._get_dynamic_route(route, action) for action in detail_actions]
             elif isinstance(route, DynamicListRoute):
-                # Dynamic list routes (@list_route decorator)
-                ret += _get_dynamic_routes(route, list_routes)
+                routes += [self._get_dynamic_route(route, action) for action in list_actions]
             else:
                 # Standard route
-                ret.append(route)
+                routes.append(route)
 
-        return ret
+        return routes
+
+    def _get_dynamic_route(self, route, action):
+        initkwargs = route.initkwargs.copy()
+        initkwargs.update(action.kwargs)
+
+        url_path = escape_curly_brackets(action.url_path)
+
+        return Route(
+            url=replace_methodname(route.url, url_path),
+            name=replace_methodname(route.name, action.url_name),
+            mapping={http_method: action.__name__
+                     for http_method in action.bind_to_methods},
+            initkwargs=initkwargs,
+        )
 
     def get_method_map(self, viewset, method_map):
         """
