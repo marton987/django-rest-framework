@@ -130,6 +130,26 @@ def schema(view_inspector):
     return decorator
 
 
+def action(methods=None, detail=True, url_name=None, url_path=None, **kwargs):
+    """
+    Mark a ViewSet method as a routable action.
+
+    Set the `detail` boolean to determine if this action should apply to
+    instance/detail requests or collection/list requests.
+    """
+    methods = ['get'] if (methods is None) else methods
+    methods = [method.lower() for method in methods]
+
+    def decorator(func):
+        func.bind_to_methods = methods
+        func.detail = detail
+        func.url_name = url_name or func.__name__
+        func.url_path = url_path or func.__name__
+        func.kwargs = kwargs
+        return func
+    return decorator
+
+
 def detail_route(methods=None, **kwargs):
     """
     Used to mark a method on a ViewSet that should be routed for detail requests.
