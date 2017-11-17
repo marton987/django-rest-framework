@@ -134,25 +134,21 @@ def detail_route(methods=None, **kwargs):
     """
     Used to mark a method on a ViewSet that should be routed for detail requests.
     """
-    methods = ['get'] if (methods is None) else methods
-
-    def decorator(func):
-        func.bind_to_methods = methods
-        func.detail = True
-        func.kwargs = kwargs
-        return func
-    return decorator
+    warnings.warn(
+        "`detail_route` has been deprecated in favor of `action`, which accepts a "
+        "`detail` boolean. Use `@action(['GET'], detail=True)` instead.",
+        PendingDeprecationWarning
+    )
+    return action(methods, detail=True, **kwargs)
 
 
 def list_route(methods=None, **kwargs):
     """
     Used to mark a method on a ViewSet that should be routed for list requests.
     """
-    methods = ['get'] if (methods is None) else methods
-
-    def decorator(func):
-        func.bind_to_methods = methods
-        func.detail = False
-        func.kwargs = kwargs
-        return func
-    return decorator
+    warnings.warn(
+        "`list_route` has been deprecated in favor of `action`, which accepts a "
+        "`detail` boolean. Use `@action(['GET'], detail=False)` instead.",
+        PendingDeprecationWarning
+    )
+    return action(methods, detail=False, **kwargs)
