@@ -16,6 +16,7 @@ For example, you might have a `urls.py` that looks something like this:
 from __future__ import unicode_literals
 
 import itertools
+import warnings
 from collections import OrderedDict, namedtuple
 
 from django.conf.urls import url
@@ -30,9 +31,28 @@ from rest_framework.schemas.views import SchemaView
 from rest_framework.settings import api_settings
 from rest_framework.urlpatterns import format_suffix_patterns
 
-Route = namedtuple('Route', ['url', 'mapping', 'name', 'initkwargs'])
-DynamicDetailRoute = namedtuple('DynamicDetailRoute', ['url', 'name', 'initkwargs'])
-DynamicListRoute = namedtuple('DynamicListRoute', ['url', 'name', 'initkwargs'])
+Route = namedtuple('Route', ['url', 'mapping', 'name', 'detail', 'initkwargs'])
+DynamicRoute = namedtuple('DynamicRoute', ['url', 'name', 'detail', 'initkwargs'])
+
+
+class DynamicDetailRoute(object):
+    def __new__(cls, url, name, initkwargs):
+        warnings.warn(
+            "`DynamicDetailRoute` has been deprecated in favor of `DynamicRoute`, which accepts a "
+            "`detail` boolean. Use `DynamicRoute(url, name, True, initkwargs)` instead.",
+            PendingDeprecationWarning
+        )
+        return DynamicRoute(url, name, detail=True, initkwargs=initkwargs)
+
+
+class DynamicListRoute(object):
+    def __new__(cls, url, name, initkwargs):
+        warnings.warn(
+            "`DynamicListRoute` has been deprecated in favor of `DynamicRoute`, which accepts a "
+            "`detail` boolean. Use `DynamicRoute(url, name, False, initkwargs)` instead.",
+            PendingDeprecationWarning
+        )
+        return DynamicRoute(url, name, False, initkwargs)
 
 
 def escape_curly_brackets(url_path):
@@ -103,14 +123,16 @@ class SimpleRouter(BaseRouter):
                 'post': 'create'
             },
             name='{basename}-list',
+            detail=False,
             initkwargs={'suffix': 'List'}
         ),
         # Dynamically generated list routes.
         # Generated using @list_route decorator
         # on methods of the viewset.
-        DynamicListRoute(
+        DynamicRoute(
             url=r'^{prefix}/{methodname}{trailing_slash}$',
             name='{basename}-{methodnamehyphen}',
+            detail=False,
             initkwargs={}
         ),
         # Detail route.
@@ -123,13 +145,15 @@ class SimpleRouter(BaseRouter):
                 'delete': 'destroy'
             },
             name='{basename}-detail',
+            detail=True,
             initkwargs={'suffix': 'Instance'}
         ),
         # Dynamically generated detail routes.
         # Generated using @detail_route decorator on methods of the viewset.
-        DynamicDetailRoute(
+        DynamicRoute(
             url=r'^{prefix}/{lookup}/{methodname}{trailing_slash}$',
             name='{basename}-{methodnamehyphen}',
+            detail=True,
             initkwargs={}
         ),
     ]
@@ -178,9 +202,9 @@ class SimpleRouter(BaseRouter):
 
         routes = []
         for route in self.routes:
-            if isinstance(route, DynamicDetailRoute):
+            if isinstance(route, DynamicRoute) and route.detail:
                 routes += [self._get_dynamic_route(route, action) for action in detail_actions]
-            elif isinstance(route, DynamicListRoute):
+            elif isinstance(route, DynamicRoute) and not route.detail:
                 routes += [self._get_dynamic_route(route, action) for action in list_actions]
             else:
                 # Standard route
@@ -196,9 +220,10 @@ class SimpleRouter(BaseRouter):
 
         return Route(
             url=replace_methodname(route.url, url_path),
-            name=replace_methodname(route.name, action.url_name),
             mapping={http_method: action.__name__
                      for http_method in action.bind_to_methods},
+            name=replace_methodname(route.name, action.url_name),
+            detail=route.detail,
             initkwargs=initkwargs,
         )
 
