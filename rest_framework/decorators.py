@@ -144,11 +144,12 @@ def action(methods=None, detail=True, name=None, url_name=None, url_path=None, *
     def decorator(func):
         func.bind_to_methods = methods
         func.detail = detail
+        func.name = name or pretty_name(func.__name__)
         func.url_name = url_name or func.__name__
         func.url_path = url_path or func.__name__
         func.kwargs = kwargs
         func.kwargs.update({
-            'name': name or pretty_name(func.__name__),
+            'name': func.name,
             'description': func.__doc__ or None
         })
 

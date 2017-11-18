@@ -18,9 +18,11 @@ automatically.
 """
 from __future__ import unicode_literals
 
+from collections import OrderedDict
 from functools import update_wrapper
 from inspect import getmembers
 
+from django.urls import NoReverseMatch
 from django.utils.decorators import classonlymethod
 from django.views.decorators.csrf import csrf_exempt
 
@@ -143,6 +145,33 @@ class ViewSetMixin(object):
         Get the methods that are marked as an extra ViewSet `@action`.
         """
         return [method for _, method in getmembers(cls, _is_extra_action)]
+
+    def get_extra_action_url_map(self):
+        """
+        Build a map of actions: urls for the extra actions. This requires the
+        `detail` attribute to have been provided.
+        """
+        action_map = OrderedDict()
+
+        # exit early if `detail` has not been provided
+        if self.detail is None:
+            return action_map
+
+        # filter for the relevant extra actions
+        actions = [
+            action for action in self.get_extra_actions()
+            if action.detail == self.detail
+        ]
+
+        for action in actions:
+            try:
+                url_name = '%s-%s' % (self.basename, action.url_name)
+                url = reverse(url_name, self.args, self.kwargs, request=self.request)
+                action_map[action.name] = url
+            except NoReverseMatch:
+                pass  # do nothing, URL requires additionalargs to reverse
+
+        return action_map
 
 
 def _is_extra_action(attr):
