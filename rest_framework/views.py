@@ -30,6 +30,9 @@ def get_view_name(view):
 
     This function is the default for the `VIEW_NAME_FUNCTION` setting.
     """
+    if view.name is not None:
+        return view.name
+
     name = view.__class__.__name__
     name = formatting.remove_trailing_string(name, 'View')
     name = formatting.remove_trailing_string(name, 'ViewSet')
@@ -50,7 +53,11 @@ def get_view_description(view, html=False):
 
     This function is the default for the `VIEW_DESCRIPTION_FUNCTION` setting.
     """
-    description = view.__class__.__doc__ or ''
+    if view.description is not None:
+        description = view.description
+    else:
+        description = view.__class__.__doc__ or ''
+
     description = formatting.dedent(smart_text(description))
     if html:
         return formatting.markup_description(description)
@@ -106,6 +113,10 @@ def exception_handler(exc, context):
 
 
 class APIView(View):
+
+    # Allow the view name and description to be set by the initkwargs.
+    name = None
+    description = None
 
     # The following policies may be set at either globally, or per-view.
     renderer_classes = api_settings.DEFAULT_RENDERER_CLASSES
