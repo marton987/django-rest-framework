@@ -296,6 +296,7 @@ class SimpleRouter(BaseRouter):
                 initkwargs = route.initkwargs.copy()
                 initkwargs.update({
                     'basename': basename,
+                    'detail': route.detail,
                 })
 
                 view = viewset.as_view(mapping, **initkwargs)
