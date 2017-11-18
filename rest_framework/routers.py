@@ -64,18 +64,6 @@ def escape_curly_brackets(url_path):
     return url_path
 
 
-def replace_methodname(format_string, methodname):
-    """
-    Partially format a format_string, swapping out any
-    '{methodname}' or '{methodnamehyphen}' components.
-    """
-    methodnamehyphen = methodname.replace('_', '-')
-    ret = format_string
-    ret = ret.replace('{methodname}', methodname)
-    ret = ret.replace('{methodnamehyphen}', methodnamehyphen)
-    return ret
-
-
 def flatten(list_of_lists):
     """
     Takes an iterable of iterables, returns a single iterable containing all items
@@ -130,8 +118,8 @@ class SimpleRouter(BaseRouter):
         # Generated using @list_route decorator
         # on methods of the viewset.
         DynamicRoute(
-            url=r'^{prefix}/{methodname}{trailing_slash}$',
-            name='{basename}-{methodnamehyphen}',
+            url=r'^{prefix}/{url_path}{trailing_slash}$',
+            name='{basename}-{url_name}',
             detail=False,
             initkwargs={}
         ),
@@ -151,8 +139,8 @@ class SimpleRouter(BaseRouter):
         # Dynamically generated detail routes.
         # Generated using @detail_route decorator on methods of the viewset.
         DynamicRoute(
-            url=r'^{prefix}/{lookup}/{methodname}{trailing_slash}$',
-            name='{basename}-{methodnamehyphen}',
+            url=r'^{prefix}/{lookup}/{url_path}{trailing_slash}$',
+            name='{basename}-{url_name}',
             detail=True,
             initkwargs={}
         ),
@@ -219,10 +207,10 @@ class SimpleRouter(BaseRouter):
         url_path = escape_curly_brackets(action.url_path)
 
         return Route(
-            url=replace_methodname(route.url, url_path),
+            url=route.url.replace('{url_path}', url_path),
             mapping={http_method: action.__name__
                      for http_method in action.bind_to_methods},
-            name=replace_methodname(route.name, action.url_name),
+            name=route.name.replace('{url_name}', action.url_name),
             detail=route.detail,
             initkwargs=initkwargs,
         )
