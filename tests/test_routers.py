@@ -19,6 +19,35 @@ from rest_framework.utils import json
 factory = APIRequestFactory()
 
 
+@override_settings(ROOT_URLCONF='tests.test_routers')
+class URLPatternsTestCase(TestCase):
+    """
+    Isolates URL patterns used during testing on the test class itself.
+    For example:
+
+    class MyTestCase(URLPatternsTestCase):
+        urlpatterns = [
+            ...
+        ]
+
+        def test_something(self):
+            ...
+    """
+    @classmethod
+    def setUpClass(cls):
+        super(URLPatternsTestCase, cls).setUpClass()
+
+        global urlpatterns
+        urlpatterns = cls.urlpatterns
+
+    @classmethod
+    def tearDownClass(cls):
+        super(URLPatternsTestCase, cls).tearDownClass()
+
+        global urlpatterns
+        urlpatterns = []
+
+
 class RouterTestModel(models.Model):
     uuid = models.CharField(max_length=20)
     text = models.CharField(max_length=200)
@@ -89,22 +118,9 @@ namespaced_router.register(r'example', MockViewSet, base_name='example')
 
 empty_prefix_router = SimpleRouter()
 empty_prefix_router.register(r'', EmptyPrefixViewSet, base_name='empty_prefix')
-empty_prefix_urls = [
-    url(r'^', include(empty_prefix_router.urls)),
-]
 
 regex_url_path_router = SimpleRouter()
 regex_url_path_router.register(r'', RegexUrlPathViewSet, base_name='regex')
-
-urlpatterns = [
-    url(r'^non-namespaced/', include(namespaced_router.urls)),
-    url(r'^namespaced/', include((namespaced_router.urls, 'example'), namespace='example')),
-    url(r'^example/', include(notes_router.urls)),
-    url(r'^example2/', include(kwarged_notes_router.urls)),
-
-    url(r'^empty-prefix/', include(empty_prefix_urls)),
-    url(r'^regex/', include(regex_url_path_router.urls))
-]
 
 
 class BasicViewSet(viewsets.ViewSet):
@@ -155,8 +171,12 @@ class TestSimpleRouter(TestCase):
                 assert route.mapping[method] == endpoint
 
 
-@override_settings(ROOT_URLCONF='tests.test_routers')
-class TestRootView(TestCase):
+class TestRootView(URLPatternsTestCase):
+    urlpatterns = [
+        url(r'^non-namespaced/', include(namespaced_router.urlpatterns)),
+        url(r'^namespaced/', include(namespaced_router.urlpatterns, namespace='namespaced')),
+    ]
+
     def test_retrieve_namespaced_root(self):
         response = self.client.get('/namespaced/')
         assert response.data == {"example": "http://testserver/namespaced/example/"}
@@ -166,11 +186,15 @@ class TestRootView(TestCase):
         assert response.data == {"example": "http://testserver/non-namespaced/example/"}
 
 
-@override_settings(ROOT_URLCONF='tests.test_routers')
-class TestCustomLookupFields(TestCase):
+class TestCustomLookupFields(URLPatternsTestCase):
     """
     Ensure that custom lookup fields are correctly routed.
     """
+    urlpatterns = [
+        url(r'^example/', include(notes_router.urlpatterns)),
+        url(r'^example2/', include(kwarged_notes_router.urlpatterns)),
+    ]
+
     def setUp(self):
         RouterTestModel.objects.create(uuid='123', text='foo bar')
         RouterTestModel.objects.create(uuid='a b', text='baz qux')
@@ -218,12 +242,17 @@ class TestLookupValueRegex(TestCase):
 
 
 @override_settings(ROOT_URLCONF='tests.test_routers')
-class TestLookupUrlKwargs(TestCase):
+class TestLookupUrlKwargs(URLPatternsTestCase):
     """
     Ensure the router honors lookup_url_kwarg.
 
     Setup a deep lookup_field, but map it to a simple URL kwarg.
     """
+    urlpatterns = [
+        url(r'^example/', include(notes_router.urlpatterns)),
+        url(r'^example2/', include(kwarged_notes_router.urlpatterns)),
+    ]
+
     def setUp(self):
         RouterTestModel.objects.create(uuid='123', text='foo bar')
 
@@ -407,8 +436,11 @@ class TestDynamicListAndDetailRouter(TestCase):
         self._test_list_and_detail_route_decorators(SubDynamicListAndDetailViewSet)
 
 
-@override_settings(ROOT_URLCONF='tests.test_routers')
-class TestEmptyPrefix(TestCase):
+class TestEmptyPrefix(URLPatternsTestCase):
+    urlpatterns = [
+        url(r'^empty-prefix/', include(empty_prefix_router.urlpatterns)),
+    ]
+
     def test_empty_prefix_list(self):
         response = self.client.get('/empty-prefix/')
         assert response.status_code == 200
@@ -421,8 +453,11 @@ class TestEmptyPrefix(TestCase):
         assert json.loads(response.content.decode('utf-8')) == {'uuid': '111', 'text': 'First'}
 
 
-@override_settings(ROOT_URLCONF='tests.test_routers')
-class TestRegexUrlPath(TestCase):
+class TestRegexUrlPath(URLPatternsTestCase):
+    urlpatterns = [
+        url(r'^regex/', include(regex_url_path_router.urlpatterns)),
+    ]
+
     def test_regex_url_path_list(self):
         kwarg = '1234'
         response = self.client.get('/regex/list/{}/'.format(kwarg))
