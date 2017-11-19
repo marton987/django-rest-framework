@@ -296,10 +296,8 @@ class APIRootView(views.APIView):
     def get(self, request, *args, **kwargs):
         # Return a plain {"name": "hyperlink"} response.
         ret = OrderedDict()
-        namespace = request.resolver_match.namespace
         for key, url_name in self.api_root_dict.items():
-            if namespace:
-                url_name = namespace + ':' + url_name
+            url_name = 'rest_framework:' + url_name
             try:
                 ret[key] = reverse(
                     url_name,
