@@ -6,19 +6,15 @@ import uuid
 from decimal import ROUND_DOWN, ROUND_UP, Decimal
 
 import pytest
+import pytz
 from django.http import QueryDict
 from django.test import TestCase, override_settings
 from django.utils import six
 from django.utils.timezone import activate, deactivate, utc
 
 import rest_framework
-from rest_framework import compat, serializers
+from rest_framework import serializers
 from rest_framework.fields import DjangoImageField, is_simple_callable
-
-try:
-    import pytz
-except ImportError:
-    pytz = None
 
 try:
     import typings
@@ -1250,7 +1246,6 @@ class TestNaiveDateTimeField(FieldValues):
     field = serializers.DateTimeField(default_timezone=None)
 
 
-@pytest.mark.skipif(pytz is None, reason='pytz not installed')
 class TestTZWithDateTimeField(FieldValues):
     """
     Valid and invalid values for `DateTimeField` when not using UTC as the timezone.
@@ -1273,7 +1268,6 @@ class TestTZWithDateTimeField(FieldValues):
         cls.field = serializers.DateTimeField(default_timezone=kolkata)
 
 
-@pytest.mark.skipif(pytz is None, reason='pytz not installed')
 @override_settings(TIME_ZONE='UTC', USE_TZ=True)
 class TestDefaultTZDateTimeField(TestCase):
     """
@@ -1312,7 +1306,7 @@ class TestNaiveDayLightSavingTimeTimeZoneDateTimeField(FieldValues):
     class MockTimezone:
         @staticmethod
         def localize(value, is_dst):
-            raise compat.InvalidTimeError()
+            raise pytz.InvalidTimeError()
 
         def __str__(self):
             return 'America/New_York'
